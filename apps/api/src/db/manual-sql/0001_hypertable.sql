@@ -1,0 +1,55 @@
+-- Run once after the drizzle-generated usage_events table exists.
+-- drizzle-kit has no concept of Timescale hypertables, so this step is
+-- hand-written and applied separately (see db/migrate.ts).
+
+ALTER TABLE usage_events ADD PRIMARY KEY (id, occurred_at);
+
+SELECT create_hypertable('usage_events', by_range('occurred_at'), if_not_exists => TRUE);
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS usage_rollup_hourly
+WITH (timescaledb.continuous) AS
+SELECT
+  time_bucket('1 hour', occurred_at) AS bucket,
+  project_id,
+  provider,
+  model,
+  status,
+  sum(total_tokens) AS total_tokens,
+  sum(cost_usd) AS total_cost_usd,
+  count(*) AS event_count,
+  avg(latency_ms) AS avg_latency_ms,
+  percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95_latency_ms,
+  count(*) FILTER (WHERE status = 'error') AS error_count
+FROM usage_events
+GROUP BY bucket, project_id, provider, model, status
+WITH NO DATA;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS usage_rollup_daily
+WITH (timescaledb.continuous) AS
+SELECT
+  time_bucket('1 day', occurred_at) AS bucket,
+  project_id,
+  provider,
+  model,
+  status,
+  sum(total_tokens) AS total_tokens,
+  sum(cost_usd) AS total_cost_usd,
+  count(*) AS event_count,
+  avg(latency_ms) AS avg_latency_ms,
+  percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95_latency_ms,
+  count(*) FILTER (WHERE status = 'error') AS error_count
+FROM usage_events
+GROUP BY bucket, project_id, provider, model, status
+WITH NO DATA;
+
+SELECT add_continuous_aggregate_policy('usage_rollup_hourly',
+  start_offset => INTERVAL '3 hours',
+  end_offset => INTERVAL '1 hour',
+  schedule_interval => INTERVAL '1 hour',
+  if_not_exists => TRUE);
+
+SELECT add_continuous_aggregate_policy('usage_rollup_daily',
+  start_offset => INTERVAL '3 days',
+  end_offset => INTERVAL '1 day',
+  schedule_interval => INTERVAL '1 day',
+  if_not_exists => TRUE);
