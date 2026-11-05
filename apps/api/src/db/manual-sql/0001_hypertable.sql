@@ -1,6 +1,11 @@
 -- Run once after the drizzle-generated usage_events table exists.
 -- drizzle-kit has no concept of Timescale hypertables, so this step is
 -- hand-written and applied separately (see db/migrate.ts).
+--
+-- p95 latency is deliberately not in these continuous aggregates: ordered-set
+-- aggregates (percentile_cont/percentile_disc) aren't supported inside
+-- timescaledb.continuous views. p95 is computed with a bounded raw-table
+-- scan over usage_events at query time instead (see Week 7 metrics routes).
 
 ALTER TABLE usage_events ADD PRIMARY KEY (id, occurred_at);
 
@@ -18,7 +23,7 @@ SELECT
   sum(cost_usd) AS total_cost_usd,
   count(*) AS event_count,
   avg(latency_ms) AS avg_latency_ms,
-  percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95_latency_ms,
+  max(latency_ms) AS max_latency_ms,
   count(*) FILTER (WHERE status = 'error') AS error_count
 FROM usage_events
 GROUP BY bucket, project_id, provider, model, status
@@ -36,7 +41,7 @@ SELECT
   sum(cost_usd) AS total_cost_usd,
   count(*) AS event_count,
   avg(latency_ms) AS avg_latency_ms,
-  percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95_latency_ms,
+  max(latency_ms) AS max_latency_ms,
   count(*) FILTER (WHERE status = 'error') AS error_count
 FROM usage_events
 GROUP BY bucket, project_id, provider, model, status

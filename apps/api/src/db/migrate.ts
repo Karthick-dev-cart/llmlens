@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 async function main() {
   const connectionString =
-    process.env.DATABASE_URL ?? "postgres://llmlens:llmlens@localhost:5432/llmlens";
+    process.env.DATABASE_URL ?? "postgres://llmlens:llmlens@localhost:5433/llmlens";
   const sql = postgres(connectionString, { max: 1 });
   const db = drizzle(sql);
 

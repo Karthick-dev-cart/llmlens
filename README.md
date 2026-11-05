@@ -37,6 +37,8 @@ pnpm dev               # runs all apps via turbo
 
 API health check: `http://localhost:3001/health`. Web: `http://localhost:3000`.
 
+Local Postgres is exposed on **5433** (not 5432) to avoid clashing with a native Postgres install.
+
 ## Roadmap (10-week build plan)
 
 | Week | Milestone | Demo at end of week |
