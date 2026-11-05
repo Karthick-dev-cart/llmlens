@@ -7,7 +7,11 @@
 -- timescaledb.continuous views. p95 is computed with a bounded raw-table
 -- scan over usage_events at query time instead (see Week 7 metrics routes).
 
-ALTER TABLE usage_events ADD PRIMARY KEY (id, occurred_at);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'usage_events_pkey') THEN
+    ALTER TABLE usage_events ADD PRIMARY KEY (id, occurred_at);
+  END IF;
+END $$;
 
 SELECT create_hypertable('usage_events', by_range('occurred_at'), if_not_exists => TRUE);
 
