@@ -133,6 +133,31 @@ latency, and a small fraction of traffic on a model that's deliberately not
 in `model_pricing` — exercising the `cost_usd = NULL` path with realistic
 data instead of only ever being tested by hand.
 
+### Dashboard (`apps/web`)
+
+Next.js (App Router, Cache Components enabled) server-rendering against the
+API — no client-side data fetching for the dashboard itself. Auth is a
+dev-only stub today: a Server Action calls `POST /v1/auth/dev-login`, stores
+the returned token in an httpOnly cookie, and every dashboard route reads
+that cookie and forwards it as a Bearer token. That's deliberately the same
+shape a real Clerk integration will use, so swapping auth later shouldn't
+touch the data-fetching code. `/dashboard` shows summary cards and a daily
+cost chart wired to the rollup-backed `/metrics/summary` and
+`/metrics/timeseries` endpoints; `/dashboard/keys` is full API key
+create/revoke, with the one-time raw key (never shown again) surfaced via
+`useActionState` rather than a page reload.
+
+With `cacheComponents: true`, Next 16 inverts the usual caching default —
+routes are static unless something forces them dynamic, rather than dynamic
+unless cached. Request-time APIs (`cookies()`, uncached `fetch`) correctly
+exclude a route from prerendering without failing the build; only
+synchronous IO (`Date.now()`, `crypto.randomUUID()`) during prerender is a
+hard error. Since literally every dashboard route is personalized/live data,
+`instant = false` on `app/dashboard/layout.tsx` opts the whole subtree out of
+the instant-navigation validator instead of fighting it — confirmed with
+`next build` (`/` prerenders static, `/dashboard*` is dynamic) and by hand in
+a browser against the live stack.
+
 ## Roadmap (10-week build plan)
 
 | Week | Milestone | Demo at end of week |
@@ -152,4 +177,4 @@ data instead of only ever being tested by hand.
 
 ## Stack
 
-Turborepo/pnpm · Fastify + TypeScript · Next.js (App Router) · TimescaleDB (Postgres) · Drizzle ORM · BullMQ/Redis · Clerk (auth) · Resend (email) · Fly.io (api/worker) + Vercel (web) + Timescale Cloud (db).
+Turborepo/pnpm · Fastify + TypeScript · Next.js (App Router, Cache Components) · TimescaleDB (Postgres) · Drizzle ORM · BullMQ/Redis · dev-stub auth today, Clerk planned · Resend (email) · Fly.io (api/worker) + Vercel (web) + Timescale Cloud (db).
