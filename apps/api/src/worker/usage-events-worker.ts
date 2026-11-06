@@ -31,7 +31,12 @@ async function resolveCostsForBatch(data: UsageEventsJobData) {
 
   return data.events.map((event) => {
     const pricing = pricingByKey.get(`${event.provider}:${event.model}`) ?? null;
-    const costUsd = calculateCostUsd(pricing, event.promptTokens, event.completionTokens);
+    if (!pricing) {
+      console.warn(`no model_pricing for ${event.provider}/${event.model} — storing cost_usd=NULL`);
+    }
+    const costUsd = pricing
+      ? calculateCostUsd(pricing, event.promptTokens, event.completionTokens).toFixed(8)
+      : null;
     return {
       projectId: data.projectId,
       orgId: data.orgId,
@@ -42,7 +47,7 @@ async function resolveCostsForBatch(data: UsageEventsJobData) {
       promptTokens: event.promptTokens,
       completionTokens: event.completionTokens,
       totalTokens: event.totalTokens,
-      costUsd: costUsd.toFixed(8),
+      costUsd,
       latencyMs: event.latencyMs ?? null,
       status: event.status,
       errorType: event.errorType ?? null,

@@ -66,7 +66,10 @@ export const usageEvents = pgTable(
     promptTokens: integer("prompt_tokens").notNull().default(0),
     completionTokens: integer("completion_tokens").notNull().default(0),
     totalTokens: integer("total_tokens").notNull().default(0),
-    costUsd: numeric("cost_usd", { precision: 12, scale: 8 }).notNull().default("0"),
+    // NULL means "no pricing found for this provider/model at this time" —
+    // deliberately distinct from a genuine $0 cost, so SUM(cost_usd) in the
+    // rollups doesn't silently treat unpriced usage as free.
+    costUsd: numeric("cost_usd", { precision: 12, scale: 8 }),
     latencyMs: integer("latency_ms"),
     status: text("status").notNull(),
     errorType: text("error_type"),
