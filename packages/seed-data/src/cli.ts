@@ -124,6 +124,7 @@ async function cmdBackfill(argv: string[]) {
   // dependency at all, and failing fast there would be a bad default.
   const { db } = await import("@llmlens/db");
   const { usageEvents } = await import("@llmlens/db/schema");
+  const { sql } = await import("drizzle-orm");
   const { DEMO_MODEL_PRICING, calculateCostUsd } = await import("@llmlens/shared-types");
 
   const pricingByKey = new Map(
@@ -174,6 +175,20 @@ async function cmdBackfill(argv: string[]) {
   console.log(
     `Backfilled ${totalInserted} rows in ${elapsedSec.toFixed(1)}s (${(totalInserted / elapsedSec).toFixed(0)} rows/sec)`,
   );
+
+  // Continuous-aggregate refresh *policies* only ever refresh a recent
+  // sliding window (see manual-sql/0001_hypertable.sql) — they will never
+  // touch historical data backfilled here, so the rollups would otherwise
+  // silently stay empty for this entire range. refresh_continuous_aggregate
+  // can't run inside a transaction block, hence the raw, standalone CALLs.
+  console.log("Refreshing continuous aggregates over the backfilled range...");
+  await db.execute(
+    sql`CALL refresh_continuous_aggregate('usage_rollup_daily', ${from.toISOString()}::timestamptz, ${to.toISOString()}::timestamptz)`,
+  );
+  await db.execute(
+    sql`CALL refresh_continuous_aggregate('usage_rollup_hourly', ${from.toISOString()}::timestamptz, ${to.toISOString()}::timestamptz)`,
+  );
+  console.log("Done.");
   process.exit(0);
 }
 

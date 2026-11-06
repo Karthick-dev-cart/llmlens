@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "@llmlens/db": "workspace:*",
-    "@llmlens/shared-types": "workspace:*"
+    "@llmlens/shared-types": "workspace:*",
+    "drizzle-orm": "^0.38.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
