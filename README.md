@@ -40,6 +40,19 @@ API health check: `http://localhost:3001/health`. Web: `http://localhost:3000`.
 
 Local Postgres is exposed on **5433** (not 5432) to avoid clashing with a native Postgres install.
 
+### Rollup correctness & performance (`@llmlens/db`)
+
+```bash
+pnpm --filter @llmlens/db bench [projectId]
+```
+
+Compares `usage_rollup_daily` against a raw `usage_events` scan for the same
+project, bucket-by-bucket (not just grand totals), and times both. Against
+the ~1.03M-row seeded dataset: **~25ms via the rollup vs ~500ms for the
+equivalent raw scan (~20x)**, with all 108 daily buckets matching exactly.
+`EXPLAIN (ANALYZE, BUFFERS)` on the rollup query confirms it touches only the
+materialized aggregate's chunks — never `usage_events` itself.
+
 ### Synthetic data (`@llmlens/seed-data`)
 
 ```bash
