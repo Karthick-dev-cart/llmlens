@@ -3,7 +3,7 @@ import { createRedisConnection } from "../lib/redis.js";
 import { db } from "@llmlens/db";
 import { usageEvents } from "@llmlens/db/schema";
 import { lookupPricing } from "../lib/pricing/pricing-lookup.js";
-import { calculateCostUsd } from "../lib/pricing/cost.js";
+import { calculateCostUsd } from "@llmlens/shared-types";
 import { USAGE_EVENTS_QUEUE, type UsageEventsJobData } from "../queue/index.js";
 
 // Pricing is grouped by (provider, model) within a batch and looked up once
