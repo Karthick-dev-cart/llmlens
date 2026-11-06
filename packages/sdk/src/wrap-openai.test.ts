@@ -207,4 +207,31 @@ describe("wrapOpenAI", () => {
     expect(event.totalTokens).toBe(16);
     expect(event.status).toBe("success");
   });
+
+  it("captures an error event when a streaming call fails before the stream even opens, and still rejects for the caller", async () => {
+    const create = vi.fn(async () => {
+      const err: any = new Error("rate limited");
+      err.status = 429;
+      throw err;
+    });
+    const client = makeFakeClient(create);
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true });
+    const wrapped = wrapOpenAI(client, {
+      apiKey: "k",
+      endpoint: "http://localhost:3001",
+      flushIntervalMs: 60_000,
+      fetchImpl,
+    });
+
+    await expect(
+      wrapped.chat.completions.create({ model: "gpt-4o", messages: [], stream: true }),
+    ).rejects.toThrow("rate limited");
+
+    await shutdownAllCaptures();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const event = JSON.parse(fetchImpl.mock.calls[0]![1].body).events[0];
+    expect(event.status).toBe("error");
+    expect(event.errorType).toBe("http_429");
+    expect(event.model).toBe("gpt-4o");
+  });
 });

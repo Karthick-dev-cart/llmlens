@@ -149,6 +149,31 @@ export function wrapOpenAI<T extends OpenAIClientLike>(client: T, options: WrapO
           }
         },
       );
+    }, (err: unknown) => {
+      // originalCreate() rejected before the stream even opened (auth
+      // failure, 429, invalid model, ...) — the non-streaming path captures
+      // this via instrumentCreate's two-arg .then(); this branch needs the
+      // same, but must re-throw, since returning normally here would
+      // resolve the derived promise to undefined and swallow the caller's
+      // error instead of propagating it.
+      try {
+        capture.capture({
+          occurredAt: new Date().toISOString(),
+          provider: "openai",
+          model: requestedModel,
+          operation: "chat.completions",
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+          latencyMs: Math.round(performance.now() - startedAt),
+          status: "error",
+          errorType: extractErrorType(err),
+          tags,
+        });
+      } catch {
+        // never let a capture failure mask the real error below
+      }
+      throw err;
     });
   }
 
