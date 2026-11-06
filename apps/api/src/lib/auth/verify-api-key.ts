@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { and, eq, isNull } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import { apiKeys, projects } from "../../db/schema/index.js";
+import { db } from "@llmlens/db";
+import { apiKeys, projects } from "@llmlens/db/schema";
 import { hashApiKey } from "./api-key.js";
 
 export interface ApiKeyContext {

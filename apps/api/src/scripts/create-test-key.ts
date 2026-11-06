@@ -1,8 +1,8 @@
 // Dev-only helper: until Clerk auth + the dashboard's own key-management UI
 // land in Week 6, this is how we get an org/project/API key to test the
 // ingestion pipeline end-to-end. Not exposed as an HTTP route.
-import { db } from "../db/client.js";
-import { organizations, projects, apiKeys } from "../db/schema/index.js";
+import { db } from "@llmlens/db";
+import { organizations, projects, apiKeys } from "@llmlens/db/schema";
 import { generateApiKey } from "../lib/auth/api-key.js";
 
 async function main() {

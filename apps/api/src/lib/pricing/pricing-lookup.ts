@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, isNull, lte, or } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import { modelPricing } from "../../db/schema/index.js";
+import { db } from "@llmlens/db";
+import { modelPricing } from "@llmlens/db/schema";
 
 export async function lookupPricing(provider: string, model: string, occurredAt: Date) {
   const [row] = await db

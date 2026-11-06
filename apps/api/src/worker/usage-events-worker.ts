@@ -1,7 +1,7 @@
 import { Worker, type Job } from "bullmq";
 import { createRedisConnection } from "../lib/redis.js";
-import { db } from "../db/client.js";
-import { usageEvents } from "../db/schema/index.js";
+import { db } from "@llmlens/db";
+import { usageEvents } from "@llmlens/db/schema";
 import { lookupPricing } from "../lib/pricing/pricing-lookup.js";
 import { calculateCostUsd } from "../lib/pricing/cost.js";
 import { USAGE_EVENTS_QUEUE, type UsageEventsJobData } from "../queue/index.js";

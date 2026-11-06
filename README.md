@@ -10,9 +10,10 @@ Teams integrating multiple LLM providers lose track of spend fast: no per-featur
 
 ```
 apps/
-  api/            Fastify ingestion + query API, BullMQ worker, Drizzle/Timescale schema
+  api/            Fastify ingestion + query API, BullMQ worker
   web/             Next.js dashboard, landing page, public no-login demo
 packages/
+  db/             @llmlens/db — Drizzle/Timescale schema, migrations, client (shared by api + seed-data)
   sdk/            @llmlens/sdk — Proxy-based OpenAI/Anthropic wrapper, async usage capture
   shared-types/   Zod schemas shared by api/web/sdk (the ingestion contract)
   seed-data/       Synthetic usage-event generator — load-test tool and public demo seed
@@ -31,7 +32,7 @@ infra/
 ```bash
 pnpm install
 pnpm db:up            # starts Postgres+Timescale and Redis (requires Docker running)
-pnpm --filter @llmlens/api db:migrate
+pnpm db:migrate         # requires DATABASE_URL in the environment (see packages/db/.env.example)
 pnpm dev               # runs all apps via turbo
 ```
 
