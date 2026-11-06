@@ -6,6 +6,14 @@
 -- aggregates (percentile_cont/percentile_disc) aren't supported inside
 -- timescaledb.continuous views. p95 is computed with a bounded raw-table
 -- scan over usage_events at query time instead (see Week 7 metrics routes).
+--
+-- Both views default to materialized_only = true, meaning queries only see
+-- data the refresh policy has already materialized — roughly the last hour
+-- (daily) / 3 hours (hourly, per the policy offsets below) is invisible to
+-- the rollup. For a "real-time spend" dashboard this is a real gap, not a
+-- rounding error: decide at Week 7 whether to rebuild these with
+-- materialized_only = false (view unions materialized + a live tail query)
+-- or have the query layer union rollup + a raw scan of the recent window.
 
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'usage_events_pkey') THEN
