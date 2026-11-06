@@ -7,13 +7,17 @@
 -- timescaledb.continuous views. p95 is computed with a bounded raw-table
 -- scan over usage_events at query time instead (see Week 7 metrics routes).
 --
--- Both views default to materialized_only = true, meaning queries only see
--- data the refresh policy has already materialized — roughly the last hour
--- (daily) / 3 hours (hourly, per the policy offsets below) is invisible to
--- the rollup. For a "real-time spend" dashboard this is a real gap, not a
--- rounding error: decide at Week 7 whether to rebuild these with
--- materialized_only = false (view unions materialized + a live tail query)
--- or have the query layer union rollup + a raw scan of the recent window.
+-- Both views set materialized_only = false (below): the Timescale default
+-- (true) means queries only see data the refresh policy has already
+-- materialized — roughly the last hour (daily) / 3 hours (hourly, per the
+-- policy offsets below) would be invisible. For a dashboard pitched on
+-- *real-time* spend visibility, a dashboard chart that can't show the usage
+-- event you just sent through the SDK moments ago directly breaks the
+-- Week 6 "sees own usage live" demo — and would look fine against the
+-- historical seed data, which is fully materialized, so this would stay
+-- hidden until a live SDK call was actually driven through to the chart.
+-- false makes the view transparently union materialized history with a
+-- live query of the unmaterialized tail — one query, no app-level UNION.
 
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'usage_events_pkey') THEN
@@ -70,3 +74,6 @@ SELECT add_continuous_aggregate_policy('usage_rollup_daily',
   end_offset => INTERVAL '1 day',
   schedule_interval => INTERVAL '1 day',
   if_not_exists => TRUE);
+
+ALTER MATERIALIZED VIEW usage_rollup_hourly SET (timescaledb.materialized_only = false);
+ALTER MATERIALIZED VIEW usage_rollup_daily SET (timescaledb.materialized_only = false);
