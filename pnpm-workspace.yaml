@@ -4,3 +4,5 @@ packages:
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
+minimumReleaseAgeExclude:
+  - openai@7.53.0

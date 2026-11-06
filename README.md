@@ -23,7 +23,7 @@ infra/
 
 **Key design decisions:**
 - **Cost is server-authoritative.** The SDK sends only raw token counts; the ingestion worker computes `cost_usd` from a versioned `model_pricing` table. One source of truth, auditable if provider pricing changes.
-- **Non-blocking SDK.** The wrapper returns the caller's original promise untouched; usage capture rides along via `.then()`/`.catch()` on that same promise and is batched/flushed separately. Zero added latency to the real LLM call — this is the thing to benchmark and prove, not just assert.
+- **Non-blocking SDK.** The wrapper returns the caller's original promise untouched; usage capture rides along via `.then()`/`.catch()` on that same promise and is batched/flushed separately. Benchmarked, not just asserted: ~2.9µs added per call against a local fake (`pnpm --filter @llmlens/sdk bench`) — noise next to any real LLM round-trip.
 - **TimescaleDB over ClickHouse.** Hypertables + continuous aggregates give real rollup performance while staying in transactional SQL — the right tradeoff for a solo-operated product, at the cost of ClickHouse-grade raw throughput we don't need yet.
 - **Async ingestion via BullMQ/Redis.** Decouples the write path from request handling so ingestion spikes don't degrade API latency; gives a real backpressure/retry story.
 
@@ -39,6 +39,43 @@ pnpm dev               # runs all apps via turbo
 API health check: `http://localhost:3001/health`. Web: `http://localhost:3000`.
 
 Local Postgres is exposed on **5433** (not 5432) to avoid clashing with a native Postgres install.
+
+### SDK (`@llmlens/sdk`)
+
+```ts
+import OpenAI from "openai";
+import { wrapOpenAI } from "@llmlens/sdk";
+
+const openai = wrapOpenAI(new OpenAI(), {
+  apiKey: process.env.LLMLENS_API_KEY!,
+  endpoint: "https://ingest.llmlens.dev", // or http://localhost:3001 locally
+  tags: { feature: "support-bot" },
+});
+
+// use `openai` exactly like the real client — same return value, same types
+const completion = await openai.chat.completions.create({ model: "gpt-4o", messages: [...] });
+```
+
+`wrapOpenAI` traps `chat.completions.create` via a `Proxy` (three levels deep —
+client → `chat` → `completions` — so every other method/property passes
+through completely untouched) and returns the SDK's own promise unmodified.
+Capture rides along via `.then()`/`.catch()` registered on that same
+promise, batches in memory, and flushes to `/v1/events/batch` on a timer —
+none of it is awaited before the wrapped call returns. Verified structurally
+against the real `openai` package's class instance (not just a duck-typed
+test double — private fields/getters behave differently under `Proxy`) and
+end-to-end through the live ingestion pipeline into the hypertable.
+
+```bash
+pnpm --filter @llmlens/sdk bench
+```
+
+50k calls against a fast local fake (isolating the wrapper's own overhead
+from LLM-API network variance): **~2.9µs added per call** — call `shutdownAllCaptures()`
+before process exit to flush anything still buffered.
+
+Streaming responses aren't captured yet (passed straight through, logged
+once) — that's Week 6, alongside Anthropic support.
 
 ### Rollup correctness & performance (`@llmlens/db`)
 
