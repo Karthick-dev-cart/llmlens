@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { startOfUtcDay } from "@llmlens/shared-types";
 import { db } from "./client.js";
 
 // Verifies two things against whatever data is actually in the DB (not a
@@ -39,10 +40,8 @@ async function main() {
   // Align to whole-day boundaries up front so both queries cover identical
   // calendar days — otherwise a partial first/last day reads as a mismatch
   // that isn't one.
-  const from = `${range.min_at.slice(0, 10)}T00:00:00Z`;
-  const toExclusive = new Date(
-    new Date(`${range.max_at.slice(0, 10)}T00:00:00Z`).getTime() + 86_400_000,
-  ).toISOString();
+  const from = startOfUtcDay(range.min_at);
+  const toExclusive = new Date(new Date(startOfUtcDay(range.max_at)).getTime() + 86_400_000).toISOString();
   console.log(`project ${projectId}, range [${from}, ${toExclusive})\n`);
 
   // Buckets with time_bucket(), the same function the continuous aggregate

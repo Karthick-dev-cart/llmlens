@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { sql } from "drizzle-orm";
 import { db } from "@llmlens/db";
+import { startOfUtcDay } from "@llmlens/shared-types";
 import { verifySessionAuth } from "../../lib/auth/verify-session.js";
 import { assertProjectAccess } from "../../lib/projects/access.js";
 
@@ -8,7 +9,9 @@ function parseRange(query: unknown): { from: string; to: string } {
   const q = query as { from?: string; to?: string };
   const to = q.to ?? new Date().toISOString();
   const from = q.from ?? new Date(Date.now() - 30 * 86_400_000).toISOString();
-  return { from, to };
+  // bucket values are day-truncated, so a precise (non-midnight) `from`
+  // would exclude that whole day's bucket row (bucket 00:00 < from 15:02).
+  return { from: startOfUtcDay(from), to };
 }
 
 interface SummaryRow {
