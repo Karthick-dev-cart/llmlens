@@ -74,8 +74,27 @@ pnpm --filter @llmlens/sdk bench
 from LLM-API network variance): **~2.9µs added per call** — call `shutdownAllCaptures()`
 before process exit to flush anything still buffered.
 
-Streaming responses aren't captured yet (passed straight through, logged
-once) — that's Week 6, alongside Anthropic support.
+**Anthropic:**
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+import { wrapAnthropic } from "@llmlens/sdk";
+
+const anthropic = wrapAnthropic(new Anthropic(), { apiKey: process.env.LLMLENS_API_KEY!, endpoint: "..." });
+const message = await anthropic.messages.create({ model: "claude-3-5-sonnet-20241022", max_tokens: 1024, messages: [...] });
+```
+
+**Streaming (OpenAI only so far):** forces `stream_options.include_usage: true`
+(preserving any other options) and taps the terminal chunk for usage. The
+returned value is a `Proxy` over the real `Stream` — every chunk passes
+through unmodified and in order, and SDK-specific extras like `.controller`
+survive — only iteration itself is intercepted, which is also why this one
+case returns a *new* promise rather than the original: something has to
+transform what it resolves to. If a caller explicitly sets
+`include_usage: false`, the call is passed through completely unwrapped
+instead of recording misleading zeroed usage. Anthropic streaming
+(`message_start`/`content_block_delta`/`message_delta` events, usage split
+across two of them) is a materially different shape and isn't supported yet.
 
 ### Rollup correctness & performance (`@llmlens/db`)
 

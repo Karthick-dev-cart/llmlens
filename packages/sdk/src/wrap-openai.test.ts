@@ -9,6 +9,21 @@ function makeFakeClient(createImpl: (...args: unknown[]) => Promise<unknown>) {
   };
 }
 
+function makeFakeStream(chunks: unknown[], extra: Record<string, unknown> = {}) {
+  return {
+    ...extra,
+    async *[Symbol.asyncIterator]() {
+      for (const chunk of chunks) yield chunk;
+    },
+  };
+}
+
+async function drain<T>(stream: AsyncIterable<T>): Promise<T[]> {
+  const out: T[] = [];
+  for await (const chunk of stream) out.push(chunk);
+  return out;
+}
+
 afterEach(async () => {
   await shutdownAllCaptures();
   vi.restoreAllMocks();
@@ -127,8 +142,8 @@ describe("wrapOpenAI", () => {
     expect(result).toEqual({ data: ["untouched"] });
   });
 
-  it("passes streaming calls straight through without instrumenting them", async () => {
-    const streamResult = { [Symbol.asyncIterator]: () => {} };
+  it("passes streaming calls straight through, unwrapped, when include_usage is explicitly disabled", async () => {
+    const streamResult = makeFakeStream([{ model: "gpt-4o", choices: [], usage: null }]);
     const create = vi.fn(async () => streamResult);
     const client = makeFakeClient(create);
     const fetchImpl = vi.fn().mockResolvedValue({ ok: true });
@@ -139,9 +154,57 @@ describe("wrapOpenAI", () => {
       fetchImpl,
     });
 
-    const result = await wrapped.chat.completions.create({ model: "gpt-4o", messages: [], stream: true });
-    expect(result).toBe(streamResult);
+    const result = await wrapped.chat.completions.create({
+      model: "gpt-4o",
+      messages: [],
+      stream: true,
+      stream_options: { include_usage: false },
+    });
+    expect(result).toBe(streamResult); // literally the same object — not even a Proxy
     await shutdownAllCaptures();
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("taps a default streaming call: passes every chunk through unmodified and captures terminal usage", async () => {
+    const chunks = [
+      { model: "gpt-4o", choices: [{ delta: { content: "Hel" } }], usage: null },
+      { model: "gpt-4o", choices: [{ delta: { content: "lo" } }], usage: null },
+      { model: "gpt-4o", choices: [], usage: { prompt_tokens: 12, completion_tokens: 4, total_tokens: 16 } },
+    ];
+    const fakeStream = makeFakeStream(chunks, { controller: "preserved" });
+    const create = vi.fn(async (...args: unknown[]) => {
+      // the wrapper must have forced include_usage on, since the caller didn't set it
+      expect((args[0] as { stream_options?: unknown }).stream_options).toEqual({ include_usage: true });
+      return fakeStream;
+    });
+    const client = makeFakeClient(create);
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true });
+    const wrapped = wrapOpenAI(client, {
+      apiKey: "k",
+      endpoint: "http://localhost:3001",
+      flushIntervalMs: 60_000,
+      fetchImpl,
+    });
+
+    const resultStream = await wrapped.chat.completions.create({
+      model: "gpt-4o",
+      messages: [],
+      stream: true,
+    });
+
+    // extra properties on the real Stream object pass through the Proxy
+    expect((resultStream as unknown as { controller: string }).controller).toBe("preserved");
+
+    const received = await drain(resultStream as AsyncIterable<unknown>);
+    expect(received).toEqual(chunks); // every chunk delivered unmodified, in order
+
+    await shutdownAllCaptures();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const event = JSON.parse(fetchImpl.mock.calls[0]![1].body).events[0];
+    expect(event.model).toBe("gpt-4o");
+    expect(event.promptTokens).toBe(12);
+    expect(event.completionTokens).toBe(4);
+    expect(event.totalTokens).toBe(16);
+    expect(event.status).toBe("success");
   });
 });

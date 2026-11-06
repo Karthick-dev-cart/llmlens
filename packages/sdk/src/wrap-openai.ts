@@ -1,4 +1,6 @@
 import { UsageCapture, type CaptureOptions } from "./capture.js";
+import { instrumentCreate } from "./instrument.js";
+import { tapStream } from "./tap-stream.js";
 
 export interface WrapOpenAIOptions extends CaptureOptions {
   tags?: Record<string, string>;
@@ -7,6 +9,11 @@ export interface WrapOpenAIOptions extends CaptureOptions {
 interface ChatCompletionLike {
   model?: string;
   usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+}
+
+interface ChatCompletionChunkLike {
+  model?: string;
+  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null;
 }
 
 interface ChatCompletionsClientLike {
@@ -23,87 +30,126 @@ interface OpenAIClientLike {
   chat: { completions: ChatCompletionsClientLike };
 }
 
-let warnedAboutStreaming = false;
+function extractErrorType(err: unknown): string | undefined {
+  const status = (err as { status?: number } | undefined)?.status;
+  return status ? `http_${status}` : "unknown";
+}
+
+let warnedAboutDisabledStreamUsage = false;
 
 /**
  * Wraps an OpenAI client so chat.completions.create calls are captured for
- * usage tracking, without adding latency to the call itself: the wrapper
- * returns the exact same promise the real SDK returned, untouched. Capture
- * happens via .then()/.catch() registered on that promise, which runs
- * concurrently with whatever the caller does next — it never delays the
- * value the caller is awaiting.
+ * usage tracking.
  *
- * Only non-streaming calls are captured in this version; a streaming
- * request is passed straight through untouched (not instrumented at all),
- * logged once per process, rather than silently recording wrong (zero-token)
- * usage for it.
+ * Non-streaming: the wrapper returns the SDK's own promise untouched;
+ * capture attaches via .then()/.catch() on that same promise and is never
+ * awaited before returning, so it adds no latency to the call itself.
+ *
+ * Streaming: the caller gets a *new* promise (unavoidable — we have to
+ * transform what it resolves to) that resolves to a Proxy over the real
+ * Stream object. Only iteration is intercepted; `.controller`, `.tee()`,
+ * etc. all pass through to the real Stream untouched. Usage is captured
+ * from the terminal chunk once the stream ends. If the caller has
+ * explicitly disabled `stream_options.include_usage`, there's no usage
+ * data to capture — the stream is passed through completely unwrapped
+ * instead of silently recording zeroed usage.
  */
 export function wrapOpenAI<T extends OpenAIClientLike>(client: T, options: WrapOpenAIOptions): T {
   const capture = new UsageCapture(options);
   const tags = options.tags;
   const originalCreate = client.chat.completions.create.bind(client.chat.completions);
 
-  function wrappedCreate(...args: unknown[]): Promise<unknown> {
-    const params = args[0] as { model?: string; stream?: boolean } | undefined;
+  const instrumentedNonStreaming = instrumentCreate(originalCreate, capture, {
+    provider: "openai",
+    operation: "chat.completions",
+    tags,
+    getRequestedModel: (args: unknown[]) => (args[0] as { model?: string } | undefined)?.model ?? "unknown",
+    extractUsage: (response: ChatCompletionLike) => ({
+      model: response.model ?? "unknown",
+      promptTokens: response.usage?.prompt_tokens ?? 0,
+      completionTokens: response.usage?.completion_tokens ?? 0,
+      totalTokens: response.usage?.total_tokens ?? 0,
+    }),
+    extractErrorType,
+  });
 
-    if (params?.stream) {
-      if (!warnedAboutStreaming) {
-        warnedAboutStreaming = true;
+  function wrappedCreate(...args: unknown[]): Promise<unknown> {
+    const params = args[0] as
+      | { model?: string; stream?: boolean; stream_options?: { include_usage?: boolean } }
+      | undefined;
+
+    if (!params?.stream) {
+      return instrumentedNonStreaming(...args);
+    }
+
+    if (params.stream_options?.include_usage === false) {
+      if (!warnedAboutDisabledStreamUsage) {
+        warnedAboutDisabledStreamUsage = true;
         console.warn(
-          "[llmlens] streaming chat completions aren't captured yet — this call is unaffected, it just won't appear in usage data",
+          "[llmlens] stream_options.include_usage is explicitly false — this call is unaffected, it just won't appear in usage data",
         );
       }
       return originalCreate(...args);
     }
 
+    // Force include_usage so the terminal chunk carries token counts,
+    // preserving whatever other stream_options the caller set.
+    const patchedArgs = [...args];
+    patchedArgs[0] = { ...params, stream_options: { ...params.stream_options, include_usage: true } };
+
+    const requestedModel = params.model ?? "unknown";
     const startedAt = performance.now();
-    const requestedModel = params?.model ?? "unknown";
-    const result = originalCreate(...args);
 
-    result.then(
-      (response) => {
-        try {
-          const completion = response as ChatCompletionLike;
-          capture.capture({
-            occurredAt: new Date().toISOString(),
-            provider: "openai",
-            model: completion.model ?? requestedModel,
-            operation: "chat.completions",
-            promptTokens: completion.usage?.prompt_tokens ?? 0,
-            completionTokens: completion.usage?.completion_tokens ?? 0,
-            totalTokens: completion.usage?.total_tokens ?? 0,
-            latencyMs: Math.round(performance.now() - startedAt),
-            status: "success",
-            tags,
-          });
-        } catch {
-          // capture must never surface as a rejection of a derived promise
-          // nobody is awaiting — swallow and move on.
-        }
-      },
-      (err: unknown) => {
-        try {
-          const status = (err as { status?: number } | undefined)?.status;
-          capture.capture({
-            occurredAt: new Date().toISOString(),
-            provider: "openai",
-            model: requestedModel,
-            operation: "chat.completions",
-            promptTokens: 0,
-            completionTokens: 0,
-            totalTokens: 0,
-            latencyMs: Math.round(performance.now() - startedAt),
-            status: "error",
-            errorType: status ? `http_${status}` : "unknown",
-            tags,
-          });
-        } catch {
-          // same as above
-        }
-      },
-    );
+    return originalCreate(...patchedArgs).then((stream: AsyncIterable<ChatCompletionChunkLike>) => {
+      let capturedModel = requestedModel;
+      let usage: ChatCompletionChunkLike["usage"];
 
-    return result;
+      return tapStream(
+        stream,
+        (chunk) => {
+          const c = chunk as ChatCompletionChunkLike;
+          if (c.model) capturedModel = c.model;
+          if (c.usage) usage = c.usage;
+        },
+        () => {
+          try {
+            capture.capture({
+              occurredAt: new Date().toISOString(),
+              provider: "openai",
+              model: capturedModel,
+              operation: "chat.completions",
+              promptTokens: usage?.prompt_tokens ?? 0,
+              completionTokens: usage?.completion_tokens ?? 0,
+              totalTokens: usage?.total_tokens ?? 0,
+              latencyMs: Math.round(performance.now() - startedAt),
+              status: "success",
+              tags,
+            });
+          } catch {
+            // never surface into the stream consumer
+          }
+        },
+        (err) => {
+          try {
+            capture.capture({
+              occurredAt: new Date().toISOString(),
+              provider: "openai",
+              model: capturedModel,
+              operation: "chat.completions",
+              promptTokens: 0,
+              completionTokens: 0,
+              totalTokens: 0,
+              latencyMs: Math.round(performance.now() - startedAt),
+              status: "error",
+              errorType: extractErrorType(err),
+              tags,
+            });
+          } catch {
+            // same as above
+          }
+        },
+      );
+    });
   }
 
   const completionsProxy = new Proxy(client.chat.completions, {
