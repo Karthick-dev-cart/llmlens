@@ -40,6 +40,30 @@ API health check: `http://localhost:3001/health`. Web: `http://localhost:3000`.
 
 Local Postgres is exposed on **5433** (not 5432) to avoid clashing with a native Postgres install.
 
+### Synthetic data (`@llmlens/seed-data`)
+
+```bash
+# write events to a JSONL file for inspection
+pnpm --filter @llmlens/seed-data seed generate --from 2026-01-01 --to 2026-02-01 --out events.jsonl
+
+# stress-test the real ingestion pipeline over HTTP (API must be running)
+pnpm --filter @llmlens/seed-data seed load --from 2026-01-01 --to 2026-01-15 \
+  --api http://localhost:3001 --key <api-key> --peak-per-hour 150
+
+# bulk-insert directly into usage_events — the practical path to millions of
+# rows (bypasses HTTP/queue; computes cost client-side the same way the
+# worker does, from the same DEMO_MODEL_PRICING table)
+pnpm --filter @llmlens/seed-data seed backfill --from 2025-11-01 --to 2026-02-01 \
+  --project <uuid> --org <uuid> --peak-per-hour 2000
+```
+
+The generator simulates request seasonality (business hours, weekends), an
+adoption growth ramp, a model mix that shifts from flagship to cost-optimized
+models over the range, scattered incident windows with elevated errors and
+latency, and a small fraction of traffic on a model that's deliberately not
+in `model_pricing` — exercising the `cost_usd = NULL` path with realistic
+data instead of only ever being tested by hand.
+
 ## Roadmap (10-week build plan)
 
 | Week | Milestone | Demo at end of week |

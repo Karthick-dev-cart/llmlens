@@ -135,16 +135,25 @@ importers:
 
   packages/seed-data:
     dependencies:
+      '@llmlens/db':
+        specifier: workspace:*
+        version: link:../db
       '@llmlens/shared-types':
         specifier: workspace:*
         version: link:../shared-types
     devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.5
       tsx:
         specifier: ^4.19.2
         version: 4.23.15
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.5)(lightningcss@1.32.0)(supports-color@7.2.0)
 
   packages/shared-types:
     dependencies:
