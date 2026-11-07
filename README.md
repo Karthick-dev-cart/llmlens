@@ -158,6 +158,18 @@ the instant-navigation validator instead of fighting it — confirmed with
 `next build` (`/` prerenders static, `/dashboard*` is dynamic) and by hand in
 a browser against the live stack.
 
+`/dashboard/breakdown` groups cost/tokens/errors by model, provider,
+status, or feature tag over the same 30-day window, and `/dashboard/events`
+is a raw per-event log with provider/status filters and keyset-cursor
+pagination — both server-rendered, both work via plain `<form method="get">`
+and `<Link>` search params rather than client-side state, so filters and
+pagination are shareable URLs and don't need JS. Model/provider/status
+breakdowns read straight from `usage_rollup_daily` (already grouped by those
+columns); the feature-tag breakdown and the p50/p95 latency stat next to the
+Overview chart are bounded raw-table scans instead, since tags aren't rolled
+up and `percentile_cont` isn't supported inside a `timescaledb.continuous`
+view.
+
 ## Roadmap (10-week build plan)
 
 | Week | Milestone | Demo at end of week |
