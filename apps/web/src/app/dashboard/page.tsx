@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api";
 import { requireSessionAndProject } from "@/lib/auth";
-import type { MetricsSummary, MetricsTimeseries } from "@/lib/types";
+import { formatMs } from "@/lib/format";
+import type { LatencyMetrics, MetricsSummary, MetricsTimeseries } from "@/lib/types";
 import { SummaryCards } from "@/components/SummaryCards";
 import { MetricsChart } from "@/components/MetricsChart";
 
@@ -8,9 +9,10 @@ export default async function DashboardOverviewPage() {
   const { token, project } = await requireSessionAndProject();
   if (!project) return null;
 
-  const [summary, timeseries] = await Promise.all([
+  const [summary, timeseries, latency] = await Promise.all([
     apiFetch<MetricsSummary>(`/v1/projects/${project.id}/metrics/summary`, token),
     apiFetch<MetricsTimeseries>(`/v1/projects/${project.id}/metrics/timeseries`, token),
+    apiFetch<LatencyMetrics>(`/v1/projects/${project.id}/metrics/latency`, token),
   ]);
 
   return (
@@ -21,7 +23,14 @@ export default async function DashboardOverviewPage() {
       </div>
       <SummaryCards summary={summary} />
       <div className="rounded-lg border border-foreground/10 p-4">
-        <h2 className="mb-2 text-sm font-medium text-foreground/70">Daily cost</h2>
+        <div className="mb-2 flex items-baseline justify-between">
+          <h2 className="text-sm font-medium text-foreground/70">Daily cost</h2>
+          {latency.sampleCount > 0 && (
+            <span className="text-xs text-foreground/50">
+              latency p50 {formatMs(latency.p50LatencyMs)} · p95 {formatMs(latency.p95LatencyMs)}
+            </span>
+          )}
+        </div>
         <MetricsChart series={timeseries.series} />
       </div>
     </div>

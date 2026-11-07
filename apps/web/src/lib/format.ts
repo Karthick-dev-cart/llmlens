@@ -22,3 +22,8 @@ export function formatPercent(numerator: number, denominator: number): string {
   if (denominator === 0) return "0%";
   return `${((numerator / denominator) * 100).toFixed(1)}%`;
 }
+
+export function formatMs(value: number | null): string {
+  if (value == null) return "—";
+  return value >= 1000 ? `${(value / 1000).toFixed(2)}s` : `${value}ms`;
+}

@@ -45,3 +45,50 @@ export interface MetricsTimeseries {
   to: string;
   series: MetricsTimeseriesPoint[];
 }
+
+export type BreakdownDimension = "model" | "provider" | "status" | "feature";
+
+export interface BreakdownEntry {
+  key: string;
+  costUsd: number;
+  tokens: number;
+  events: number;
+  errors: number;
+}
+
+export interface BreakdownResponse {
+  dimension: BreakdownDimension;
+  from: string;
+  to: string;
+  breakdown: BreakdownEntry[];
+}
+
+export interface LatencyMetrics {
+  from: string;
+  to: string;
+  p50LatencyMs: number | null;
+  p95LatencyMs: number | null;
+  avgLatencyMs: number | null;
+  sampleCount: number;
+}
+
+export interface RawEvent {
+  id: string;
+  occurredAt: string;
+  provider: string;
+  model: string;
+  operation: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  costUsd: number | null;
+  latencyMs: number | null;
+  status: string;
+  errorType: string | null;
+  tags: Record<string, string>;
+}
+
+export interface EventsPage {
+  events: RawEvent[];
+  nextCursor: string | null;
+}
