@@ -14,15 +14,17 @@
     "create-test-key": "tsx src/scripts/create-test-key.ts"
   },
   "dependencies": {
-    "@llmlens/db": "workspace:*",
-    "@llmlens/shared-types": "workspace:*",
-    "fastify": "^5.2.0",
     "@fastify/cors": "^10.0.1",
-    "drizzle-orm": "^0.38.0",
+    "@fastify/rate-limit": "^11.2.2",
+    "@llmlens/db": "workspace:*",
+    "@llmlens/seed-data": "workspace:*",
+    "@llmlens/shared-types": "workspace:*",
     "bullmq": "^5.34.0",
+    "drizzle-orm": "^0.38.0",
+    "fastify": "^5.2.0",
     "ioredis": "^5.4.1",
-    "zod": "^3.24.1",
-    "pino": "^9.6.0"
+    "pino": "^9.6.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

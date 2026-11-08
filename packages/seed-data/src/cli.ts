@@ -119,74 +119,26 @@ async function cmdBackfill(argv: string[]) {
   const peakEventsPerHour = values["peak-per-hour"] ? Number(values["peak-per-hour"]) : undefined;
   const chunkSize = values["chunk-size"] ? Number(values["chunk-size"]) : 2000;
 
-  // Imported lazily: these pull in @llmlens/db's Postgres client, which
-  // requires DATABASE_URL — the generate/load commands have no DB
-  // dependency at all, and failing fast there would be a bad default.
-  const { db } = await import("@llmlens/db");
-  const { usageEvents } = await import("@llmlens/db/schema");
-  const { sql } = await import("drizzle-orm");
-  const { DEMO_MODEL_PRICING, calculateCostUsd } = await import("@llmlens/shared-types");
-
-  const pricingByKey = new Map(
-    DEMO_MODEL_PRICING.map((p) => [`${p.provider}:${p.model}`, p] as const),
-  );
-
-  let chunk: (typeof usageEvents.$inferInsert)[] = [];
-  let totalInserted = 0;
+  const { backfillRange } = await import("./backfill.js");
   const startedAt = Date.now();
 
-  async function flush() {
-    if (chunk.length === 0) return;
-    await db.insert(usageEvents).values(chunk);
-    totalInserted += chunk.length;
-    chunk = [];
-    const elapsedSec = (Date.now() - startedAt) / 1000;
-    console.log(`  inserted ${totalInserted} rows (${(totalInserted / elapsedSec).toFixed(0)}/sec)`);
-  }
-
-  for (const event of generateEvents({ from, to, seed, peakEventsPerHour })) {
-    const pricing = pricingByKey.get(`${event.provider}:${event.model}`) ?? null;
-    chunk.push({
-      projectId,
-      orgId,
-      occurredAt: new Date(event.occurredAt),
-      provider: event.provider,
-      model: event.model,
-      operation: event.operation,
-      promptTokens: event.promptTokens,
-      completionTokens: event.completionTokens,
-      totalTokens: event.totalTokens,
-      costUsd: pricing
-        ? calculateCostUsd(pricing, event.promptTokens, event.completionTokens).toFixed(8)
-        : null,
-      latencyMs: event.latencyMs ?? null,
-      status: event.status,
-      errorType: event.errorType ?? null,
-      tags: event.tags ?? {},
-      requestId: event.requestId ?? null,
-      userIdentifier: event.userIdentifier ?? null,
-      metadata: event.metadata ?? {},
-    });
-    if (chunk.length >= chunkSize) await flush();
-  }
-  await flush();
+  const { insertedRows } = await backfillRange({
+    projectId,
+    orgId,
+    from,
+    to,
+    seed,
+    peakEventsPerHour,
+    chunkSize,
+    onProgress: (n) => {
+      const elapsedSec = (Date.now() - startedAt) / 1000;
+      console.log(`  inserted ${n} rows (${(n / elapsedSec).toFixed(0)}/sec)`);
+    },
+  });
 
   const elapsedSec = (Date.now() - startedAt) / 1000;
   console.log(
-    `Backfilled ${totalInserted} rows in ${elapsedSec.toFixed(1)}s (${(totalInserted / elapsedSec).toFixed(0)} rows/sec)`,
-  );
-
-  // Continuous-aggregate refresh *policies* only ever refresh a recent
-  // sliding window (see manual-sql/0001_hypertable.sql) — they will never
-  // touch historical data backfilled here, so the rollups would otherwise
-  // silently stay empty for this entire range. refresh_continuous_aggregate
-  // can't run inside a transaction block, hence the raw, standalone CALLs.
-  console.log("Refreshing continuous aggregates over the backfilled range...");
-  await db.execute(
-    sql`CALL refresh_continuous_aggregate('usage_rollup_daily', ${from.toISOString()}::timestamptz, ${to.toISOString()}::timestamptz)`,
-  );
-  await db.execute(
-    sql`CALL refresh_continuous_aggregate('usage_rollup_hourly', ${from.toISOString()}::timestamptz, ${to.toISOString()}::timestamptz)`,
+    `Backfilled ${insertedRows} rows in ${elapsedSec.toFixed(1)}s (${(insertedRows / elapsedSec).toFixed(0)} rows/sec)`,
   );
   console.log("Done.");
   process.exit(0);

@@ -12,7 +12,8 @@
     "db:down": "docker compose -f infra/docker-compose.yml down",
     "db:generate": "pnpm --filter @llmlens/db db:generate",
     "db:migrate": "pnpm --filter @llmlens/db db:migrate",
-    "db:seed": "pnpm --filter @llmlens/db db:seed"
+    "db:seed": "pnpm --filter @llmlens/db db:seed",
+    "db:seed-demo": "pnpm --filter @llmlens/db db:seed-demo"
   },
   "devDependencies": {
     "turbo": "^2.3.0",
