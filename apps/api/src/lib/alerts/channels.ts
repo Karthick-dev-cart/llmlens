@@ -1,3 +1,5 @@
+import { isSafeWebhookUrl } from "./webhook-guard.js";
+
 export interface AlertPayload {
   projectId: string;
   period: string;
@@ -58,8 +60,15 @@ async function sendEmail(to: string, payload: AlertPayload): Promise<void> {
 
 // Slack incoming webhooks are a plain POST to a URL the user supplies in
 // their own budget config — no credential of ours involved, so this always
-// attempts a real send rather than dry-running.
+// attempts a real send rather than dry-running. The URL is re-validated
+// here (not just at budget-creation time) as the authoritative SSRF gate —
+// see webhook-guard.ts.
 async function sendSlack(webhookUrl: string, payload: AlertPayload): Promise<void> {
+  if (!(await isSafeWebhookUrl(webhookUrl))) {
+    console.error(`refusing to send to webhook URL that failed the SSRF guard: ${webhookUrl}`);
+    return;
+  }
+
   const { subject } = alertText(payload);
   const res = await fetch(webhookUrl, {
     method: "POST",

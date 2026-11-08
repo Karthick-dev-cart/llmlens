@@ -5,13 +5,19 @@ import { budgets, alertEvents } from "@llmlens/db/schema";
 import { verifySessionAuth } from "../../lib/auth/verify-session.js";
 import { assertProjectAccess } from "../../lib/projects/access.js";
 import { currentSpendUsd } from "../../lib/alerts/evaluate.js";
+import { isSafeWebhookUrl } from "../../lib/alerts/webhook-guard.js";
 
-function validateChannelConfig(config: unknown): config is Record<string, unknown> {
+// Slack URL safety is also (and authoritatively) re-checked right before
+// every send in channels.ts — this is just fail-fast UX so a bad webhook
+// URL is rejected at creation time instead of silently never firing.
+async function validateChannelConfig(config: unknown): Promise<boolean> {
   if (typeof config !== "object" || config === null) return false;
   const c = config as Record<string, unknown>;
   if (c.type === undefined) return true; // no channel configured yet — allowed
   if (c.type === "email") return typeof c.to === "string" && c.to.length > 0;
-  if (c.type === "slack") return typeof c.webhookUrl === "string" && c.webhookUrl.length > 0;
+  if (c.type === "slack") {
+    return typeof c.webhookUrl === "string" && (await isSafeWebhookUrl(c.webhookUrl));
+  }
   return false;
 }
 
@@ -55,8 +61,8 @@ export async function budgetRoutes(app: FastifyInstance) {
     if (typeof body.thresholdUsd !== "number" || !(body.thresholdUsd > 0)) {
       return reply.code(400).send({ error: "invalid_threshold" });
     }
-    const channelConfig = body.channelConfig ?? {};
-    if (!validateChannelConfig(channelConfig)) {
+    const channelConfig = (body.channelConfig ?? {}) as Record<string, unknown>;
+    if (!(await validateChannelConfig(channelConfig))) {
       return reply.code(400).send({ error: "invalid_channel_config" });
     }
 
