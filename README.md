@@ -193,6 +193,30 @@ from the most recent event every 3 hours after that, so the demo always
 looks current without anyone needing to re-seed it by hand. `/v1/demo/*`
 is rate-limited (60/min) independently of the authenticated API.
 
+### Hardening (Week 10)
+
+The demo-refresh job now prunes events older than 35 days every cycle, not
+just inserting — `usage_events` is a hypertable partitioned on `occurred_at`
+only, not `project_id`, so `drop_chunks` would have deleted other projects'
+real data; the prune is a plain project-scoped `DELETE` instead, followed by
+a continuous-aggregate refresh over the deleted span. The `/demo` page's API
+calls are now cached server-side (`"use cache"`, keyed by breakdown
+dimension, revalidating well under the 3-hour top-up interval) rather than
+re-fetched on every page view — since `/demo` is server-rendered, every
+visitor's request was hitting `/v1/demo/*` from the web server's IP, and the
+route's per-IP rate limit was protecting the wrong case in a multi-host
+deployment. Every dashboard page's data fetch is wrapped in `<Suspense>` to
+stop the Cache Components dev-overlay's "uncached data during navigation"
+warning; a cookie-only `requireSessionToken()` check still runs *before*
+each Suspense boundary so an unauthenticated request still gets a real 307
+instead of a 200 with a loading skeleton (a real regression the first pass
+at this fix introduced and a second pass caught and fixed). The monthly
+budget-alert period, previously only exercised with daily budgets, is now
+live-verified against real spend data. Monitoring (the other item under this
+week's original milestone) is deliberately not built yet — it only makes
+sense against a real deployment, and this week's scope was "deploy-ready,"
+not "deployed."
+
 ## Roadmap (10-week build plan)
 
 | Week | Milestone | Demo at end of week |
@@ -206,7 +230,7 @@ is rate-limited (60/min) independently of the authenticated API.
 | 7 | Breakdowns & filters | Group-by model/provider/tag, raw-event explorer |
 | 8 | Budgets & alerts | Real email/Slack alert on threshold breach |
 | 9 | Public demo + landing page | No-login public demo with always-fresh seeded data |
-| 10 | Hardening & launch prep | Monitoring, architecture write-up, interview notes |
+| 10 | Hardening & launch prep | Demo retention/caching fixes, auth-redirect regression caught and fixed, monthly budget path live-verified (monitoring deferred to actual deploy) |
 
 **Explicitly out of scope for the core build:** billing/payments, providers beyond OpenAI+Anthropic, real-time websocket updates, granular RBAC, multi-region infra. **Stretch, in priority order:** cost-only model-substitution advisor (explicitly not a quality evaluation), anomaly detection, live-tail, a third provider.
 
