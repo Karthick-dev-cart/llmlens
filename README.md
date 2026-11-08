@@ -170,6 +170,18 @@ Overview chart are bounded raw-table scans instead, since tags aren't rolled
 up and `percentile_cont` isn't supported inside a `timescaledb.continuous`
 view.
 
+`/dashboard/budgets` lets a project set a daily or monthly spend threshold
+with an optional email or Slack alert channel. A repeatable BullMQ job
+(60s interval, in the same worker process as ingestion but on its own
+queue — deliberately off the ingestion hot path) sums the period's spend
+from `usage_rollup_daily` and fires an alert the first time a budget crosses
+its threshold, then suppresses repeats for the rest of that period by
+checking `alert_events` for an existing trigger since the period started.
+Email goes through Resend's REST API when `RESEND_API_KEY` is set and logs
+instead of sending when it isn't (the default for local dev); Slack is a
+plain webhook POST to a URL the project supplies, no credential of ours
+involved.
+
 ## Roadmap (10-week build plan)
 
 | Week | Milestone | Demo at end of week |
