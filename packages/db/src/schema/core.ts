@@ -94,7 +94,11 @@ export const budgets = pgTable("budgets", {
 
 export const alertEvents = pgTable("alert_events", {
   id: uuid("id").defaultRandom().primaryKey(),
-  budgetId: uuid("budget_id").notNull().references(() => budgets.id),
+  // Cascade: alert history has no independent meaning once its budget
+  // (which carries the period/threshold context) is gone.
+  budgetId: uuid("budget_id")
+    .notNull()
+    .references(() => budgets.id, { onDelete: "cascade" }),
   triggeredAt: timestamp("triggered_at", { withTimezone: true }).defaultNow().notNull(),
   valueAtTrigger: numeric("value_at_trigger", { precision: 12, scale: 2 }).notNull(),
   acknowledged: timestamp("acknowledged_at", { withTimezone: true }),

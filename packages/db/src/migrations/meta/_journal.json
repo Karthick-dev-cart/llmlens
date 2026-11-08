@@ -15,6 +15,13 @@
       "when": 1793965405840,
       "tag": "0001_tidy_red_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794126356324,
+      "tag": "0002_chief_mathemanic",
+      "breakpoints": true
     }
   ]
 }

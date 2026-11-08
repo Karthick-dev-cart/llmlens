@@ -5,6 +5,7 @@ import { authRoutes } from "./routes/auth/index.js";
 import { projectRoutes } from "./routes/projects/index.js";
 import { metricsRoutes } from "./routes/metrics/index.js";
 import { eventsRoutes } from "./routes/events/index.js";
+import { budgetRoutes } from "./routes/budgets/index.js";
 
 const app = Fastify({ logger: true });
 
@@ -14,6 +15,7 @@ await app.register(authRoutes);
 await app.register(projectRoutes);
 await app.register(metricsRoutes);
 await app.register(eventsRoutes);
+await app.register(budgetRoutes);
 
 app.get("/health", async () => ({ status: "ok", service: "llmlens-api" }));
 
