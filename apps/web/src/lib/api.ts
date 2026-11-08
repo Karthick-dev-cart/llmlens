@@ -30,6 +30,17 @@ export async function apiFetch<T>(path: string, token: string, init?: RequestIni
   return res.json() as Promise<T>;
 }
 
+// No Authorization header — used only for the public, unauthenticated
+// /v1/demo/* routes.
+export async function publicApiFetch<T>(path: string): Promise<T> {
+  const res = await fetch(`${apiBaseUrl()}${path}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => undefined);
+    throw new ApiError(res.status, body);
+  }
+  return res.json() as Promise<T>;
+}
+
 export async function devLogin(): Promise<{ token: string; userId: string }> {
   const res = await fetch(`${apiBaseUrl()}/v1/auth/dev-login`, { method: "POST" });
   if (!res.ok) throw new Error(`dev-login failed: ${res.status}`);
