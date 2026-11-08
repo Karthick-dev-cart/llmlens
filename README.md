@@ -182,6 +182,17 @@ instead of sending when it isn't (the default for local dev); Slack is a
 plain webhook POST to a URL the project supplies, no credential of ours
 involved.
 
+`/demo` is a public, no-login dashboard (Overview + Breakdown) backed by
+public `/v1/demo/*` API routes. There's exactly one demo project, on a
+fixed hardcoded ID (`packages/shared-types/src/demo-project.ts`) — every
+demo route injects that ID server-side and never accepts a client-supplied
+project id, param, or (for the events cursor) pagination token, so the
+entire public surface is scoped to that one project by construction. A
+BullMQ job seeds 30 days of synthetic history on first run and tops up
+from the most recent event every 3 hours after that, so the demo always
+looks current without anyone needing to re-seed it by hand. `/v1/demo/*`
+is rate-limited (60/min) independently of the authenticated API.
+
 ## Roadmap (10-week build plan)
 
 | Week | Milestone | Demo at end of week |
