@@ -68,3 +68,66 @@ export async function revokeApiKeyAction(formData: FormData) {
   await apiFetch(`/v1/projects/${projectId}/api-keys/${keyId}`, token, { method: "DELETE" });
   revalidatePath("/dashboard/keys");
 }
+
+export interface CreateBudgetState {
+  error?: string;
+}
+
+export async function createBudgetAction(
+  _prevState: CreateBudgetState,
+  formData: FormData,
+): Promise<CreateBudgetState> {
+  const token = await getSessionToken();
+  if (!token) redirect("/");
+
+  const projectId = formData.get("projectId");
+  if (typeof projectId !== "string") redirect("/");
+
+  const period = formData.get("period");
+  if (period !== "daily" && period !== "monthly") {
+    return { error: "Choose a period." };
+  }
+
+  const thresholdUsd = Number(formData.get("thresholdUsd"));
+  if (!Number.isFinite(thresholdUsd) || thresholdUsd <= 0) {
+    return { error: "Enter a threshold greater than 0." };
+  }
+
+  const channelType = formData.get("channelType");
+  let channelConfig: Record<string, unknown> = {};
+  if (channelType === "email") {
+    const to = formData.get("channelEmail");
+    if (typeof to !== "string" || !to.trim()) return { error: "Enter an email address." };
+    channelConfig = { type: "email", to: to.trim() };
+  } else if (channelType === "slack") {
+    const webhookUrl = formData.get("channelWebhookUrl");
+    if (typeof webhookUrl !== "string" || !webhookUrl.trim()) {
+      return { error: "Enter a Slack webhook URL." };
+    }
+    channelConfig = { type: "slack", webhookUrl: webhookUrl.trim() };
+  }
+
+  try {
+    await apiFetch(`/v1/projects/${projectId}/budgets`, token, {
+      method: "POST",
+      body: JSON.stringify({ period, thresholdUsd, channelConfig }),
+    });
+  } catch {
+    return { error: "Failed to create budget." };
+  }
+
+  revalidatePath("/dashboard/budgets");
+  return {};
+}
+
+export async function deleteBudgetAction(formData: FormData) {
+  const token = await getSessionToken();
+  if (!token) redirect("/");
+
+  const projectId = formData.get("projectId");
+  const budgetId = formData.get("budgetId");
+  if (typeof projectId !== "string" || typeof budgetId !== "string") return;
+
+  await apiFetch(`/v1/projects/${projectId}/budgets/${budgetId}`, token, { method: "DELETE" });
+  revalidatePath("/dashboard/budgets");
+}

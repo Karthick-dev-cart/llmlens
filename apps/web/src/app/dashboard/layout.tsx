@@ -33,6 +33,9 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             <Link href="/dashboard/events" className="hover:text-foreground">
               Events
             </Link>
+            <Link href="/dashboard/budgets" className="hover:text-foreground">
+              Budgets
+            </Link>
             <Link href="/dashboard/keys" className="hover:text-foreground">
               API Keys
             </Link>

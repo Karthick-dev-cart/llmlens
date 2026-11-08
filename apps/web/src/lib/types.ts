@@ -92,3 +92,28 @@ export interface EventsPage {
   events: RawEvent[];
   nextCursor: string | null;
 }
+
+export type BudgetPeriod = "daily" | "monthly";
+
+export type ChannelConfig =
+  | { type: "email"; to: string }
+  | { type: "slack"; webhookUrl: string }
+  | Record<string, never>;
+
+export interface Budget {
+  id: string;
+  period: BudgetPeriod;
+  thresholdUsd: number;
+  channelConfig: ChannelConfig;
+  createdAt: string;
+  currentSpendUsd: number;
+}
+
+export interface AlertEvent {
+  id: string;
+  budgetId: string;
+  triggeredAt: string;
+  valueAtTrigger: string;
+  period: BudgetPeriod;
+  thresholdUsd: string;
+}
