@@ -1,13 +1,15 @@
 import { Suspense } from "react";
 import { apiFetch } from "@/lib/api";
-import { requireSessionAndProject } from "@/lib/auth";
+import { requireSessionAndProject, requireSessionToken } from "@/lib/auth";
 import type { AlertEvent, Budget } from "@/lib/types";
 import { CreateBudgetForm } from "@/components/CreateBudgetForm";
 import { BudgetsTable } from "@/components/BudgetsTable";
 import { AlertsTable } from "@/components/AlertsTable";
 import { PageSkeleton } from "@/components/PageSkeleton";
 
-export default function BudgetsPage() {
+export default async function BudgetsPage() {
+  await requireSessionToken();
+
   return (
     <Suspense fallback={<PageSkeleton />}>
       <BudgetsContent />

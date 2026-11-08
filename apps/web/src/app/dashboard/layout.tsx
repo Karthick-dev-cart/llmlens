@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { requireSessionAndProject } from "@/lib/auth";
+import { requireSessionAndProject, requireSessionToken } from "@/lib/auth";
 import { logoutAction } from "../actions";
 
 // The entire authenticated app is personalized/live data with no meaningful
@@ -14,7 +14,11 @@ export const instant = false;
 // data during navigation" runtime warning only goes away when the fetch is
 // actually wrapped in Suspense (confirmed: instant=false alone did not
 // suppress it).
-export default function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
+export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
+  // Must run before the Suspense boundary below, not inside it — see the
+  // comment on requireSessionToken in lib/auth.ts for why.
+  await requireSessionToken();
+
   return (
     <Suspense fallback={<div className="flex-1" />}>
       <DashboardLayoutContent>{children}</DashboardLayoutContent>

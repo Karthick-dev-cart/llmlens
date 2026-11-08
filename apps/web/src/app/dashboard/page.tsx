@@ -1,13 +1,15 @@
 import { Suspense } from "react";
 import { apiFetch } from "@/lib/api";
-import { requireSessionAndProject } from "@/lib/auth";
+import { requireSessionAndProject, requireSessionToken } from "@/lib/auth";
 import { formatMs } from "@/lib/format";
 import type { LatencyMetrics, MetricsSummary, MetricsTimeseries } from "@/lib/types";
 import { SummaryCards } from "@/components/SummaryCards";
 import { MetricsChart } from "@/components/MetricsChart";
 import { PageSkeleton } from "@/components/PageSkeleton";
 
-export default function DashboardOverviewPage() {
+export default async function DashboardOverviewPage() {
+  await requireSessionToken();
+
   return (
     <Suspense fallback={<PageSkeleton />}>
       <DashboardOverviewContent />

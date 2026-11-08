@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
-import { requireSessionAndProject } from "@/lib/auth";
+import { requireSessionAndProject, requireSessionToken } from "@/lib/auth";
 import type { BreakdownDimension, BreakdownResponse } from "@/lib/types";
 import { BreakdownTable } from "@/components/BreakdownTable";
 import { PageSkeleton } from "@/components/PageSkeleton";
@@ -17,7 +17,9 @@ function isDimension(value: string | undefined): value is BreakdownDimension {
   return DIMENSIONS.some((d) => d.value === value);
 }
 
-export default function BreakdownPage({ searchParams }: PageProps<"/dashboard/breakdown">) {
+export default async function BreakdownPage({ searchParams }: PageProps<"/dashboard/breakdown">) {
+  await requireSessionToken();
+
   return (
     <Suspense fallback={<PageSkeleton />}>
       <BreakdownContent searchParams={searchParams} />
