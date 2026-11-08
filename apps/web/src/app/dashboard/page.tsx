@@ -1,11 +1,21 @@
+import { Suspense } from "react";
 import { apiFetch } from "@/lib/api";
 import { requireSessionAndProject } from "@/lib/auth";
 import { formatMs } from "@/lib/format";
 import type { LatencyMetrics, MetricsSummary, MetricsTimeseries } from "@/lib/types";
 import { SummaryCards } from "@/components/SummaryCards";
 import { MetricsChart } from "@/components/MetricsChart";
+import { PageSkeleton } from "@/components/PageSkeleton";
 
-export default async function DashboardOverviewPage() {
+export default function DashboardOverviewPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <DashboardOverviewContent />
+    </Suspense>
+  );
+}
+
+async function DashboardOverviewContent() {
   const { token, project } = await requireSessionAndProject();
   if (!project) return null;
 

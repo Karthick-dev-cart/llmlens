@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { requireSessionAndProject } from "@/lib/auth";
 import type { BreakdownDimension, BreakdownResponse } from "@/lib/types";
 import { BreakdownTable } from "@/components/BreakdownTable";
+import { PageSkeleton } from "@/components/PageSkeleton";
 
 const DIMENSIONS: { value: BreakdownDimension; label: string }[] = [
   { value: "model", label: "Model" },
@@ -15,9 +17,17 @@ function isDimension(value: string | undefined): value is BreakdownDimension {
   return DIMENSIONS.some((d) => d.value === value);
 }
 
-export default async function BreakdownPage({
+export default function BreakdownPage({ searchParams }: PageProps<"/dashboard/breakdown">) {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <BreakdownContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function BreakdownContent({
   searchParams,
-}: PageProps<"/dashboard/breakdown">) {
+}: Pick<PageProps<"/dashboard/breakdown">, "searchParams">) {
   const { token, project } = await requireSessionAndProject();
   if (!project) return null;
 

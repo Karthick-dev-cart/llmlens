@@ -1,10 +1,20 @@
+import { Suspense } from "react";
 import { apiFetch } from "@/lib/api";
 import { requireSessionAndProject } from "@/lib/auth";
 import type { ApiKeySummary } from "@/lib/types";
 import { CreateKeyForm } from "@/components/CreateKeyForm";
 import { revokeApiKeyAction } from "../../actions";
+import { PageSkeleton } from "@/components/PageSkeleton";
 
-export default async function ApiKeysPage() {
+export default function ApiKeysPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <ApiKeysContent />
+    </Suspense>
+  );
+}
+
+async function ApiKeysContent() {
   const { token, project } = await requireSessionAndProject();
   if (!project) return null;
 

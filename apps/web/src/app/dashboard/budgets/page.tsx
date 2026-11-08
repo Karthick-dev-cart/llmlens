@@ -1,11 +1,21 @@
+import { Suspense } from "react";
 import { apiFetch } from "@/lib/api";
 import { requireSessionAndProject } from "@/lib/auth";
 import type { AlertEvent, Budget } from "@/lib/types";
 import { CreateBudgetForm } from "@/components/CreateBudgetForm";
 import { BudgetsTable } from "@/components/BudgetsTable";
 import { AlertsTable } from "@/components/AlertsTable";
+import { PageSkeleton } from "@/components/PageSkeleton";
 
-export default async function BudgetsPage() {
+export default function BudgetsPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <BudgetsContent />
+    </Suspense>
+  );
+}
+
+async function BudgetsContent() {
   const { token, project } = await requireSessionAndProject();
   if (!project) return null;
 

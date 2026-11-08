@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { requireSessionAndProject } from "@/lib/auth";
 import { logoutAction } from "../actions";
@@ -7,7 +8,21 @@ import { logoutAction } from "../actions";
 // validation here rather than fighting it on every page underneath.
 export const instant = false;
 
-export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
+// The data fetch (requireSessionAndProject) still needs its own Suspense
+// boundary even with instant=false — that export silences the build-time
+// instant-navigation validator, but the dev-overlay's separate "uncached
+// data during navigation" runtime warning only goes away when the fetch is
+// actually wrapped in Suspense (confirmed: instant=false alone did not
+// suppress it).
+export default function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
+  return (
+    <Suspense fallback={<div className="flex-1" />}>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+    </Suspense>
+  );
+}
+
+async function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { project } = await requireSessionAndProject();
 
   if (!project) {

@@ -1,16 +1,26 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { requireSessionAndProject } from "@/lib/auth";
 import type { EventsPage } from "@/lib/types";
 import { EventsTable } from "@/components/EventsTable";
+import { PageSkeleton } from "@/components/PageSkeleton";
 
 function firstValue(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function EventsExplorerPage({
+export default function EventsExplorerPage({ searchParams }: PageProps<"/dashboard/events">) {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <EventsExplorerContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function EventsExplorerContent({
   searchParams,
-}: PageProps<"/dashboard/events">) {
+}: Pick<PageProps<"/dashboard/events">, "searchParams">) {
   const { token, project } = await requireSessionAndProject();
   if (!project) return null;
 
