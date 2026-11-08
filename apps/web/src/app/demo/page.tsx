@@ -1,14 +1,9 @@
 import Link from "next/link";
-import { publicApiFetch } from "@/lib/api";
-import type {
-  BreakdownDimension,
-  BreakdownResponse,
-  MetricsSummary,
-  MetricsTimeseries,
-} from "@/lib/types";
+import type { BreakdownDimension } from "@/lib/types";
 import { SummaryCards } from "@/components/SummaryCards";
 import { MetricsChart } from "@/components/MetricsChart";
 import { BreakdownTable } from "@/components/BreakdownTable";
+import { getDemoData } from "./data";
 
 const DIMENSIONS: { value: BreakdownDimension; label: string }[] = [
   { value: "model", label: "Model" },
@@ -21,9 +16,12 @@ function isDimension(value: string | undefined): value is BreakdownDimension {
   return DIMENSIONS.some((d) => d.value === value);
 }
 
-// Same reasoning as app/dashboard/layout.tsx: this route is always live
-// data (the whole point of "always-fresh"), no static shell worth carving
-// out.
+// The page shell itself is dynamic because the breakdown dimension is a
+// URL search param (read per-request, same as app/dashboard/layout.tsx's
+// reasoning for opting out of the instant-navigation validator) — not
+// because the data is uncached. The actual API calls are cached and shared
+// across all visitors by getDemoData (./data.ts); this export is about the
+// shell, that's about the data.
 export const instant = false;
 
 export default async function PublicDemoPage({ searchParams }: PageProps<"/demo">) {
@@ -31,11 +29,7 @@ export default async function PublicDemoPage({ searchParams }: PageProps<"/demo"
   const requested = Array.isArray(params.dimension) ? params.dimension[0] : params.dimension;
   const dimension: BreakdownDimension = isDimension(requested) ? requested : "model";
 
-  const [summary, timeseries, breakdown] = await Promise.all([
-    publicApiFetch<MetricsSummary>("/v1/demo/metrics/summary"),
-    publicApiFetch<MetricsTimeseries>("/v1/demo/metrics/timeseries"),
-    publicApiFetch<BreakdownResponse>(`/v1/demo/metrics/breakdown?dimension=${dimension}`),
-  ]);
+  const { summary, timeseries, breakdown } = await getDemoData(dimension);
 
   return (
     <div className="flex flex-1 flex-col">
