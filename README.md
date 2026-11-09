@@ -2,6 +2,8 @@
 
 **LLM API cost & usage observability** — a drop-in SDK plus dashboard that gives teams visibility into what their OpenAI/Anthropic spend is actually going to, in real time, without adding latency to the LLM calls themselves.
 
+GitHub: [github.com/Karthick-dev-cart/llmlens](https://github.com/Karthick-dev-cart/llmlens)
+
 ## Why this exists
 
 Teams integrating multiple LLM providers lose track of spend fast: no per-feature cost attribution, no budget alerts, no visibility into whether a cheaper model would do the job just as well. LLMLens is a small, opinionated observability layer purpose-built for that problem — not a general APM tool with LLM support bolted on.
